@@ -1,0 +1,4 @@
+-r ../sources/requirements.txt
+pytest==9.1.1
+testcontainers[postgres]==4.15.0
+httpx==0.28.1

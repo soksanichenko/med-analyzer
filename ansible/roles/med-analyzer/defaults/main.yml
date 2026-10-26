@@ -1,0 +1,55 @@
+---
+med_analyzer_container_name: 'med-analyzer'
+# The image reference is built from name and tag, so the build and the
+# container tasks can never disagree about it.
+med_analyzer_image_name: 'med-analyzer'
+med_analyzer_image_tag: 'local'
+med_analyzer_image: "{{ med_analyzer_image_name }}:{{ med_analyzer_image_tag }}"
+med_analyzer_http_port: 8000
+
+# Uploaded PDFs; mounted at /data (the app's STORAGE_DIR) and never touched by
+# the source sync.
+med_analyzer_data_dir: "{{ docker_volumes_directory }}/med-analyzer"
+# uid/gid of the unprivileged user in the image (see sources/Dockerfile).
+med_analyzer_uid: 1000
+med_analyzer_gid: 1000
+
+# Docker build context on the target host. Kept apart from the data directory:
+# the sync below deletes everything it does not know about.
+med_analyzer_build_dir: "{{ docker_volumes_directory }}/med-analyzer-build"
+
+# Path to the project on the Ansible controller — used to sync source before build.
+med_analyzer_local_source_dir: "{{ playbook_dir }}/../.."
+
+# Database: the dedicated user and database in the shared postgresql container.
+# The password (med_analyzer_db_password) has no default; it comes from
+# Infisical via the inventory group_vars.
+med_analyzer_db_user: 'med-analyzer'
+med_analyzer_db_name: 'med-analyzer'
+
+# Application settings passed to the container.
+med_analyzer_max_upload_mb: 10
+med_analyzer_log_level: 'INFO'
+
+# Memory cap of the container. Uploaded PDFs are untrusted and parsing one
+# can inflate far beyond its size; the cap keeps the host safe. The swap limit
+# is set to the same value so the container cannot use swap on top of it.
+med_analyzer_memory_limit: '768m'
+
+# Public subdomain; set in inventory group_vars,
+# e.g. med-analyzer.zelgray.cherkasy.ua
+med_analyzer_domain: ''
+
+# Discord SSO gate (meow-elite-club-portal), used by the nginx wiring: the
+# portal's public domain and the X-Service-Slug this service is registered
+# under. The slug must match the `slug` of the GatedService row.
+meow_elite_club_portal_public_domain: 'meow-elite.club'
+med_analyzer_service_slug: 'med-analyzer'
+
+# Shared nginx (infra's nginx role): the container to reload and the
+# per-domain directory for external service location snippets.
+nginx_docker_container_name: 'nginx-server'
+nginx_confd_path: "{{ docker_volumes_directory }}/nginx/conf.d"
+med_analyzer_nginx_custom_locations_path: "{{ nginx_confd_path }}/{{ med_analyzer_domain }}-custom-locations"
+...
+

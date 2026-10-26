@@ -1,0 +1,10 @@
+---
+- name: Deploy med-analyzer
+  hosts: home
+  pre_tasks:
+    - name: Load Infisical secrets
+      ansible.builtin.import_tasks: pre_tasks/infisical.yml
+  roles:
+    - med-analyzer
+...
+

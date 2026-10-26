@@ -1,0 +1,8 @@
+---
+collections:
+  - source: https://github.com/soksanichenko/infisical-ansible-collection.git
+    type: git
+    version: feat/read-secrets-include-imports
+  - name: community.docker
+...
+

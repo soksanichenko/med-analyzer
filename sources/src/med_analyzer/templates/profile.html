@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<h1>Профиль</h1>
+<p class="hint">Пол и дата рождения нужны, чтобы выбрать подходящие референсные значения.</p>
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% endif %}
+<form method="post" action="/profile" class="profile-form">
+  <fieldset>
+    <legend>Пол</legend>
+    <label><input type="radio" name="sex" value="M"{% if sex == 'M' %} checked{% endif %}> Мужской</label>
+    <label><input type="radio" name="sex" value="F"{% if sex == 'F' %} checked{% endif %}> Женский</label>
+  </fieldset>
+  <label class="field">Дата рождения
+    <input type="date" name="birth_date" value="{{ birth_date }}" min="1900-01-01" required>
+  </label>
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}

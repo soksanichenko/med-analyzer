@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Набор от {{ set.collected_on|ru_date }}{% endblock %}
+{% block content %}
+<p><a href="/sets">&larr; Все наборы</a></p>
+<h1>{{ set.lab|lab_name }}, {{ set.collected_on|ru_date }}</h1>
+{% if merged %}
+<p class="notice" role="status">Файл добавлен в существующий набор</p>
+{% endif %}
+<p class="meta">
+  {% if set.order_number %}<span>Заказ № {{ set.order_number }}</span>{% endif %}
+  {% if set.patient_name %}<span>Пациент: {{ set.patient_name }}</span>{% endif %}
+  <span>Файлов: {{ file_count }}</span>
+</p>
+{% if set.warnings %}
+<div class="warnings" role="note">
+  <strong>Предупреждения</strong>
+  <ul>
+    {% for warning in set.warnings %}
+    <li>{{ warning }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+<table class="results">
+  <thead>
+    <tr><th>Показатель</th><th>Значение</th><th>Норма</th><th>Примечание</th></tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    {% set r = row.result %}
+    <tr{% if row.direction %} class="row-out"{% endif %}>
+      <td>{{ r.raw_name }}</td>
+      <td class="value">
+        {%- if r.value is not none %}{{ r.value|num }}{% if r.unit %} {{ r.unit }}{% endif %}
+        {%- elif r.value_text %}{{ r.value_text }}
+        {%- else %}—{% endif %}
+        {%- if row.direction == 'high' %} <span class="mark" role="img" aria-label="выше нормы">▲</span>
+        {%- elif row.direction == 'low' %} <span class="mark" role="img" aria-label="ниже нормы">▼</span>{% endif %}
+      </td>
+      <td class="norm">
+        {%- if r.ref_low is not none and r.ref_high is not none %}{{ r.ref_low|num }}–{{ r.ref_high|num }}
+        {%- elif r.ref_high is not none %}до {{ r.ref_high|num }}
+        {%- elif r.ref_low is not none %}от {{ r.ref_low|num }}
+        {%- elif r.ref_raw %}<pre class="ref-raw">{{ r.ref_raw }}</pre>
+        {%- else %}—{% endif %}
+      </td>
+      <td>{% if row.flag_mismatch %}<small class="note">⚠ отметка лаборатории не совпала с расчётом</small>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<form method="post" action="/sets/{{ set.id }}/delete" class="delete-form">
+  <button type="submit" class="danger">Удалить набор</button>
+</form>
+{% endblock %}

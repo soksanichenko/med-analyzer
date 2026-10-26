@@ -1,0 +1,98 @@
+---
+- name: Create med-analyzer build directory
+  ansible.builtin.file:
+    path: "{{ med_analyzer_build_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+  tags:
+    - med-analyzer
+
+# Owned by the unprivileged user of the container, which writes the uploads.
+- name: Create med-analyzer data directory
+  ansible.builtin.file:
+    path: "{{ med_analyzer_data_dir }}"
+    state: directory
+    owner: "{{ med_analyzer_uid }}"
+    group: "{{ med_analyzer_gid }}"
+    mode: '0700'
+  become: true
+  tags:
+    - med-analyzer
+
+- name: Sync med-analyzer source to build directory
+  ansible.posix.synchronize:
+    src: "{{ med_analyzer_local_source_dir }}/sources/"
+    dest: "{{ med_analyzer_build_dir }}/"
+    delete: true
+    owner: false
+    group: false
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=.superpowers"
+      - "--exclude=__pycache__"
+      - "--exclude=*.pyc"
+      - "--exclude=.venv"
+      - "--exclude=venv"
+      # Lab reports are personal data: never copy a PDF to the server.
+      - "--exclude=*.[pP][dD][fF]"
+      - "--exclude=/tests"
+      - "--exclude=/docs"
+      # Without this, rsync never deletes files on the server that were
+      # synced before being excluded (a stale venv would stay in the image).
+      - "--delete-excluded"
+  become: true
+  register: _med_analyzer_source
+  tags:
+    - med-analyzer
+
+- name: Build med-analyzer Docker image
+  community.docker.docker_image:
+    name: "{{ med_analyzer_image_name }}"
+    tag: "{{ med_analyzer_image_tag }}"
+    source: build
+    build:
+      path: "{{ med_analyzer_build_dir }}"
+      pull: true
+    force_source: "{{ _med_analyzer_source.changed }}"
+  become: true
+  tags:
+    - med-analyzer
+
+# no_log: the environment carries the database password.
+- name: Deploy med-analyzer container
+  community.docker.docker_container:
+    name: "{{ med_analyzer_container_name }}"
+    image: "{{ med_analyzer_image }}"
+    state: started
+    restart_policy: unless-stopped
+    recreate: "{{ docker_force_recreate | default(false) }}"
+    pull: false
+    networks:
+      - name: "{{ docker_network }}"
+    volumes:
+      - "{{ med_analyzer_data_dir }}:/data"
+    env:
+      # urlencode leaves "/" alone, which would break the URL; encode it too.
+      DATABASE_URL: >-
+        postgresql+psycopg://{{ med_analyzer_db_user }}:{{
+        med_analyzer_db_password | urlencode | replace('/', '%2F')
+        }}@{{ postgresql_container_name }}:5432/{{ med_analyzer_db_name }}
+      STORAGE_DIR: '/data'
+      MAX_UPLOAD_MB: "{{ med_analyzer_max_upload_mb | string }}"
+      LOG_LEVEL: "{{ med_analyzer_log_level }}"
+    memory: "{{ med_analyzer_memory_limit }}"
+    memory_swap: "{{ med_analyzer_memory_limit }}"
+    log_driver: journald
+  become: true
+  no_log: true
+  tags:
+    - med-analyzer
+
+- name: Configure med-analyzer nginx
+  ansible.builtin.import_tasks: nginx.yml
+  tags:
+    - med-analyzer
+    - med-analyzer-nginx
+...
+

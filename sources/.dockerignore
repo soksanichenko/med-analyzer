@@ -1,0 +1,13 @@
+# Keep the build context (and the image) free of local state and personal files.
+.git
+.superpowers
+.venv
+venv
+**/__pycache__
+**/*.pyc
+**/*.[pP][dD][fF]
+.pytest_cache
+.ruff_cache
+.idea
+.env
+scripts

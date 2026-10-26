@@ -1,0 +1,21 @@
+[project]
+name = "med-analyzer"
+version = "0.1.0"
+description = "Personal medical lab results tracker: PDF import and dynamics charts"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["sources"]
+
+[tool.pytest.ini_options]
+pythonpath = ["sources/src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+src = ["sources/src"]
+
+# The owner's style rule: single quotes for string literals.
+[tool.ruff.format]
+quote-style = "single"

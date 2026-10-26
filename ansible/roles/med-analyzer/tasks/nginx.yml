@@ -1,0 +1,44 @@
+---
+# An empty domain would write the location file into a directory named
+# "-custom-locations" and register the service under "https:///".
+- name: Check that the med-analyzer domain is set
+  ansible.builtin.assert:
+    that:
+      - med_analyzer_domain | length > 0
+    fail_msg: >-
+      med_analyzer_domain is empty; set it in the inventory group_vars
+      (e.g. med-analyzer.zelgray.cherkasy.ua).
+    quiet: true
+
+- name: Deploy med-analyzer nginx location config
+  ansible.builtin.template:
+    src: location.conf.j2
+    dest: "{{ med_analyzer_nginx_custom_locations_path }}/med-analyzer.conf"
+    mode: '0644'
+  become: true
+  notify: Reload nginx
+
+# The registration token authorises writes to the portal's service list, so
+# neither the request nor a failure message may reach the log.
+- name: Register med-analyzer with the Discord SSO portal
+  ansible.builtin.uri:
+    url: "https://{{ meow_elite_club_portal_public_domain }}/api/services/register"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ meow_elite_club_portal_service_registration_token }}"
+    body_format: json
+    body:
+      slug: "{{ med_analyzer_service_slug }}"
+      name: "Medical lab results"
+      url: "https://{{ med_analyzer_domain }}/"
+    status_code: [200]
+  register: _med_analyzer_registration
+  # The portal may be briefly unreachable (it is on another host).
+  retries: 3
+  delay: 5
+  until: _med_analyzer_registration.status | default(0) == 200
+  # An upsert: it would report "changed" on every run.
+  changed_when: false
+  no_log: true
+...
+

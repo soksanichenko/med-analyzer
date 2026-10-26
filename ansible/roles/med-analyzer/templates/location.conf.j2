@@ -1,0 +1,71 @@
+# The whole app is private: every request goes through the Discord SSO gate
+# (meow-elite-club-portal), the same shape as bank-analyzer. The portal lives
+# on another host, so /internal/zw-auth and /internal/bridge reach it over the
+# public internet (through Cloudflare). The `resolver` + variable in
+# proxy_pass makes nginx re-resolve those names (Cloudflare's edge IPs
+# change) and the container name (nginx still starts while it is down).
+# `ipv6=off`: this host has no outbound IPv6 route, and an AAAA answer would
+# make random requests fail with "Network is unreachable".
+location / {
+    auth_request /internal/zw-auth;
+    auth_request_set $discord_avatar_url $upstream_http_x_discord_avatar_url;
+    auth_request_set $discord_user_id $upstream_http_x_discord_user_id;
+    error_page 401 = @zw_login;
+
+    # One uploaded PDF is capped at med_analyzer_max_upload_mb by the app;
+    # the extra megabyte covers the multipart framing.
+    client_max_body_size {{ med_analyzer_max_upload_mb + 1 }}m;
+    # The app is only reached after the gate said yes; buffering the (small)
+    # upload keeps a slow client from holding an app worker.
+    proxy_request_buffering on;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+
+    proxy_intercept_errors on;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $med_analyzer_host "{{ med_analyzer_container_name }}";
+    proxy_pass http://$med_analyzer_host:{{ med_analyzer_http_port }};
+    # The app's same-origin check falls back to comparing Origin with Host.
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $client_real_ip;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    # Always set from the gate's answer, so a client-supplied value is replaced.
+    proxy_set_header X-Discord-Avatar-Url $discord_avatar_url;
+    proxy_set_header X-Discord-User-Id $discord_user_id;
+}
+
+location = /internal/zw-auth {
+    internal;
+    # The auth subrequest is checked against this location's limit even though
+    # the body is not forwarded. State it here instead of relying on the
+    # http-level default of the shared nginx: a stricter default (nginx's own
+    # is 1m) would fail every larger upload with a 500 before it reaches the app.
+    client_max_body_size {{ med_analyzer_max_upload_mb + 1 }}m;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $meow_elite_club_portal_host "{{ meow_elite_club_portal_public_domain }}";
+    proxy_pass https://$meow_elite_club_portal_host/auth;
+    proxy_ssl_server_name on;
+    proxy_set_header Host {{ meow_elite_club_portal_public_domain }};
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Cookie $http_cookie;
+    proxy_set_header X-Service-Slug "{{ med_analyzer_service_slug }}";
+}
+
+location = /internal/bridge {
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $meow_elite_club_portal_host "{{ meow_elite_club_portal_public_domain }}";
+    proxy_pass https://$meow_elite_club_portal_host/bridge/consume$is_args$args;
+    proxy_ssl_server_name on;
+    proxy_set_header Host {{ meow_elite_club_portal_public_domain }};
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Real-IP $client_real_ip;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Cookie $http_cookie;
+}
+
+location @zw_login {
+    return 302 https://{{ meow_elite_club_portal_public_domain }}/login?next=$scheme://$host$request_uri;
+}

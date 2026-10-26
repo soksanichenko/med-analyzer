@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Анализы{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <nav>
+      <a href="/sets"{% if active == 'sets' %} class="active"{% endif %}>Анализы</a>
+      <a href="/dynamics"{% if active == 'dynamics' %} class="active"{% endif %}>Динамика</a>
+      <a href="/profile"{% if active == 'profile' %} class="active"{% endif %}>Профиль</a>
+    </nav>
+    {% if avatar_url %}
+    <img class="avatar" src="{{ avatar_url }}" alt="" width="32" height="32" referrerpolicy="no-referrer">
+    {% endif %}
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
