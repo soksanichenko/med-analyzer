@@ -25,7 +25,7 @@ WORKDIR /app
 COPY --from=python-builder /app/venv ./venv
 COPY src ./src
 COPY alembic.ini entrypoint.sh ./
-USER medanalyzer
+USER 1000
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["/app/venv/bin/python", "-c", \

@@ -5,4 +5,3 @@
     command: nginx -s reload
   become: true
 ...
-

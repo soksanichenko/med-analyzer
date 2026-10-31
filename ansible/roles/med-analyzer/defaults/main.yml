@@ -52,4 +52,3 @@ nginx_docker_container_name: 'nginx-server'
 nginx_confd_path: "{{ docker_volumes_directory }}/nginx/conf.d"
 med_analyzer_nginx_custom_locations_path: "{{ nginx_confd_path }}/{{ med_analyzer_domain }}-custom-locations"
 ...
-

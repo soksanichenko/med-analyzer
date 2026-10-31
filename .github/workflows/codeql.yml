@@ -15,9 +15,9 @@ run-name: "${{ github.event.head_commit.message || github.head_commit.message }}
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
     - cron: '29 21 * * 0'
 
@@ -35,27 +35,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - language: actions
-          build-mode: none
-        - language: python
-          build-mode: none
-        # If the project also has a frontend (npm/package.json), add:
-        # - language: javascript-typescript
-        #   build-mode: none
+          - language: actions
+            build-mode: none
+          - language: python
+            build-mode: none
+          # If the project also has a frontend (npm/package.json), add:
+          # - language: javascript-typescript
+          #   build-mode: none
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
-      with:
-        languages: ${{ matrix.language }}
-        build-mode: ${{ matrix.build-mode }}
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4
-      with:
-        category: "/language:${{matrix.language}}"
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{matrix.language}}"
 ...
-

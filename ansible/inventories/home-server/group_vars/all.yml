@@ -16,4 +16,3 @@ med_analyzer_domain: "med-analyzer.zelgray.cherkasy.ua"
 # the portal's own role on its first deploy.
 meow_elite_club_portal_service_registration_token: "{{ infisical_secrets.secrets['meow-elite-club-portal-service-registration-token'] }}"
 ...
-

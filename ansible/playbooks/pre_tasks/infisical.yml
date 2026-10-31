@@ -31,4 +31,3 @@
     infisical_secrets: "{{ _infisical_raw }}"
   no_log: true
 ...
-

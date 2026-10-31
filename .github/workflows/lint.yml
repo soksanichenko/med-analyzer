@@ -29,4 +29,3 @@ jobs:
           version: "0.15.13"
           args: "format --check sources/"
 ...
-
