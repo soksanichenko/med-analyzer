@@ -121,6 +121,10 @@ a { color: var(--accent); }
   text-align: left;
   vertical-align: top;
 }
+@media (max-width: 640px) {
+  /* Scroll the table inside itself instead of widening the whole page. */
+  .results { display: block; overflow-x: auto; }
+}
 .results .row-out { background: var(--out-bg); }
 .results .row-out .value { color: var(--error); font-weight: 600; }
 .ref-raw { margin: 0; font: inherit; font-size: 0.85rem; white-space: pre-wrap; }

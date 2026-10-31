@@ -311,6 +311,7 @@
       xAxis: {
         type: 'time',
         axisLabel: {
+          hideOverlap: true,
           // Local getters: ECharts reads a plain date as local midnight.
           formatter: (value) => {
             const day = new Date(value);
