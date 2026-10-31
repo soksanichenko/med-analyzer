@@ -132,30 +132,28 @@ refused by the gate.
 
 ## 4. First-deploy risks
 
-1. **dnf mirror 401.** On the machine this repository was developed on, the
-   AlmaLinux mirrorlist resolves to the home server's own mirror path
-   (`portal.zelgray.cherkasy.ua/almalinux/...`), which answers 401, so
-   `docker build` of `sources/Dockerfile` fails at `dnf install`. The same
-   Dockerfile shape is used by discord-meow-bot. Test the build on the server
-   before deploying (a PDF-free copy of the build context, throwaway tag).
-   `home-server` below is the Ansible inventory name, not necessarily an SSH
-   alias: use the real host (`ansible_host` in
-   `ansible/inventories/home-server/hosts.yml`) and your login, and `sudo docker`
-   if your user is not in the `docker` group:
+1. **dnf mirror 401 (resolved in infra).** `mirrors.almalinux.org` hands out
+   the owner's own mirror (`portal.zelgray.cherkasy.ua/almalinux/...`) to dnf.
+   On the home server the name resolves to the LAN address, but nginx sees a
+   `docker build` coming from the Docker bridge gateway (for example
+   `172.19.0.1`), which used to be outside `mirror_local_networks`, so the
+   mirror asked for credentials and `dnf install` failed with 401. infra's
+   `mirror` role now lists the Docker address pools (`172.16.0.0/12`) as local
+   (infra PR #97, applied with `--tags mirror`). Verified on the home server:
+   the unchanged `sources/Dockerfile` builds, runs as uid 1000 and imports the
+   application. If a build fails with 401 again, check the `remote_addr` of the
+   401 lines in `docker logs nginx-server`. To re-run the check (a PDF-free
+   copy of the build context, throwaway tag; `<user>` and `<ansible_host>` are
+   in `ansible/inventories/home-server/hosts.yml`):
 
    ```bash
    rsync -a --exclude='.git' --exclude='.venv' --exclude='__pycache__' \
        --exclude='*.[pP][dD][fF]' --exclude='/tests' --exclude='/docs' \
-       sources/ home-server:/tmp/med-analyzer-build-test/
-   ssh home-server 'docker build -t med-analyzer:probe /tmp/med-analyzer-build-test \
-       && docker rmi med-analyzer:probe; rm -rf /tmp/med-analyzer-build-test'
+       sources/ <user>@<ansible_host>:/tmp/med-analyzer-build-test/
+   ssh <user>@<ansible_host> 'cd /tmp/med-analyzer-build-test \
+       && docker build -t med-analyzer:probe . ; docker rmi med-analyzer:probe; \
+       rm -rf /tmp/med-analyzer-build-test'
    ```
-
-   If it fails with a 401/404 from dnf: either open the mirror path to the
-   Docker network, or make the Dockerfile use the official `baseurl` repos
-   (one `sed` after each `FROM`, switching `mirrorlist=` lines to the
-   commented `baseurl=` lines in `/etc/yum.repos.d/*.repo`; this is how the
-   image was verified locally).
 2. **Infra entries missing.** Until sections 1.1 to 1.3 are applied the
    container cannot log in to PostgreSQL (the migration fails and the container
    exits with code 1) and the nginx task cannot find its directory.
