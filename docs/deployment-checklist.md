@@ -251,9 +251,9 @@ container applies `alembic upgrade head` on every start and never downgrades,
 so after a release that changed the schema the older image runs against the
 newer schema: restore the dump (or run `alembic downgrade` by hand) first.
 
-## 6. Before making the repository public
+## 6. What the public repository contains
 
-Facts only; no decision is made here.
+The repository is public. Facts, and the owner's decisions:
 
 - **Fixtures.** `tests/fixtures/*.json` keep the word layout of real lab
   reports, but every measured value, every date (order, sampling, issue and
@@ -263,26 +263,15 @@ Facts only; no decision is made here.
   (`tests/test_fixtures_clean.py` checks the identity fields); the physician
   and diagnosis fields are empty. What stays as printed is public: analyte
   names, units, reference ranges, the column layout and, in the Synevo
-  fixtures, the laboratory's header (name, address, accreditation). The
-  remaining personal identifiers in the repository are only the ones listed
-  below: the owner's name and e-mail in the git authorship, `LICENSE`, the
-  `ansible_user` in `hosts.yml`, the GitHub handle in `requirements.yml`, and
-  the hostnames and the `infisical_project_id` in the inventory.
+  fixtures, the laboratory's header (name, address, accreditation).
+- **Identifiers kept on purpose.** The owner's name and e-mail (git
+  authorship, `LICENSE`), the `ansible_user` in `hosts.yml`, the GitHub
+  handle in `requirements.yml`, and the hostnames and the
+  `infisical_project_id` in the inventory. None are secrets.
+- **History.** It was rewritten once, before the first push, to drop real lab
+  values; the repository has never contained them on GitHub.
 - **Specification and plan.** `docs/superpowers/` describes the project from
-  the owner's point of view ("the owner"); read both files once for anything
-  you do not want to publish.
-- **Name and identifiers.** The owner's full name is in `LICENSE`, in the git
-  author field of every commit, and the git author email is in the history
-  too. The GitHub handle is in the collection source URL in `requirements.yml`.
-  Options: keep them, or rewrite history before publishing.
-- **Inventory.** `ansible/inventories/home-server/hosts.yml` contains the
-  server's public hostname and the SSH login name (`ansible_user`);
-  `group_vars/all.yml` contains the Infisical project id and folder path and the
-  public hostnames of the home server and the portal. None are secrets, but
-  they identify the infrastructure. Options: keep them; move them to an
-  inventory outside the repository.
-- **History.** Everything above also exists in earlier commits; changing the
-  files is not enough for the history.
+  the owner's point of view ("the owner").
 - **Local PDFs.** The real lab PDFs in the working copy are excluded by
   `.gitignore`, `sources/.dockerignore` and the rsync excludes of the role (all
   match the extension in any case); `git ls-files '*.[pP][dD][fF]'` should print
