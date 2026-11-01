@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from med_analyzer.parsing.merge import duplicate_warning
 from med_analyzer.parsing.primitives import age_in_months
 from med_analyzer.parsing.reference import select_reference
 from med_analyzer.parsing.synevo import _clean_reference, parse_synevo
@@ -261,9 +262,7 @@ def test_duplicate_with_different_value_warns_and_keeps_first(
     parsed = parse_synevo([one_page[0], second])
     assert len(parsed.results) == 1
     assert parsed.results[0].value == Decimal(97)
-    assert parsed.warnings == [
-        'Повтор показателя «Креатинін» с другим значением: 97 и 98'
-    ]
+    assert parsed.warnings == [duplicate_warning('Креатинін', '97', '98')]
 
 
 def test_identical_duplicate_does_not_warn(one_page: list[Page]) -> None:

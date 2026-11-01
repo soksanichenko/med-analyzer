@@ -9,17 +9,28 @@
   const DEBOUNCE_MS = 250;
   const Y_MIN = -100;
   const Y_MAX = 300;
-  // Okabe-Ito based and without red, which is reserved for out-of-range points.
+  // Okabe-Ito based, lightened for the dark page, and without red, which is
+  // reserved for out-of-range points.
   const PALETTE = [
-    '#0072b2', '#e69f00', '#009e73', '#6a3d9a',
-    '#56b4e9', '#cc79a7', '#8c564b', '#666666',
+    '#56b4e9', '#e69f00', '#2fc79a', '#cc79a7',
+    '#f0e442', '#8aa0ff', '#c58f6b', '#a0a7b4',
   ];
-  const OUT_COLOR = '#d93025';
-  const NORM_BAND_COLOR = 'rgba(46, 160, 67, 0.14)';
-  const NO_PERCENT = 'нет процентной шкалы (односторонняя норма)';
-  const LOAD_FAILED = 'Не удалось загрузить данные, попробуйте ещё раз';
-  const TOO_MANY = `Можно выбрать не больше ${MAX_SELECTED} показателей`;
+  const OUT_COLOR = '#ff6b6b';
+  const NORM_BAND_COLOR = 'rgba(46, 160, 67, 0.2)';
+  // Page colours, as in style.css.
+  const TEXT_COLOR = '#e6e8ec';
+  const DIM_COLOR = '#9aa1ad';
+  const LINE_COLOR = '#2a2f3a';
+  const PANEL_COLOR = '#171a21';
   const DASH = '—';
+
+  // The texts of the page language, written into the page by the server.
+  const T = JSON.parse(document.getElementById('dyn-i18n').textContent);
+  const fmt = (template, ...values) =>
+    template.replace(/\{(\d+)\}/g, (_, index) => values[Number(index)]);
+  const NO_PERCENT = T.no_percent;
+  const LOAD_FAILED = T.load_failed;
+  const TOO_MANY = fmt(T.too_many, MAX_SELECTED);
 
   const state = {
     selected: [], // analyte ids in the order of choosing
@@ -34,7 +45,7 @@
 
   // ---- formatting -----------------------------------------------------------
 
-  const comma = (text) => String(text).replace('.', ',');
+  const comma = (text) => String(text).replace('.', T.decimal);
 
   function formatPercent(percent) {
     return `${comma(percent.toFixed(1))} %`;
@@ -42,7 +53,7 @@
 
   function formatDate(iso) {
     const [year, month, day] = iso.split('-');
-    return `${day}.${month}.${year}`;
+    return T.date_order === 'ymd' ? iso : `${day}.${month}.${year}`;
   }
 
   function decimals(text) {
@@ -69,10 +80,10 @@
       return `${comma(low)}–${comma(high)}`;
     }
     if (high !== null) {
-      return `до ${comma(high)}`;
+      return fmt(T.up_to, comma(high));
     }
     if (low !== null) {
-      return `от ${comma(low)}`;
+      return fmt(T.from, comma(low));
     }
     return item.ref_raw || DASH;
   }
@@ -174,7 +185,7 @@
       remove.type = 'button';
       remove.className = 'chip-remove';
       remove.textContent = '×';
-      remove.setAttribute('aria-label', `Убрать: ${label.textContent}`);
+      remove.setAttribute('aria-label', fmt(T.remove, label.textContent));
       remove.addEventListener('click', () => toggle(id));
       chip.append(swatch, label);
       const series = state.series.get(id);
@@ -295,10 +306,10 @@
     line(node, analyte, 'tip-title');
     line(node, formatDate(point.date));
     line(node, withUnit(comma(point.value_str), point.unit));
-    line(node, `Норма: ${formatReference(point)}`);
-    line(node, `${formatPercent(point.percent)} от нормы`);
+    line(node, fmt(T.norm, formatReference(point)));
+    line(node, fmt(T.percent_of_norm, formatPercent(point.percent)));
     if (point.out === true) {
-      line(node, 'Вне нормы', 'tip-out');
+      line(node, T.out, 'tip-out');
     }
     return node;
   }
@@ -307,7 +318,14 @@
     return {
       animation: false,
       grid: { left: 56, right: 24, top: 32, bottom: 40 },
-      tooltip: { trigger: 'item', formatter: tooltipNode },
+      textStyle: { color: DIM_COLOR },
+      tooltip: {
+        trigger: 'item',
+        formatter: tooltipNode,
+        backgroundColor: PANEL_COLOR,
+        borderColor: LINE_COLOR,
+        textStyle: { color: TEXT_COLOR },
+      },
       xAxis: {
         type: 'time',
         axisLabel: {
@@ -316,17 +334,20 @@
           formatter: (value) => {
             const day = new Date(value);
             const pad = (number) => String(number).padStart(2, '0');
-            return `${pad(day.getDate())}.${pad(day.getMonth() + 1)}.${day.getFullYear()}`;
+            return formatDate(
+              `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`,
+            );
           },
         },
+        axisLine: { lineStyle: { color: LINE_COLOR } },
       },
       yAxis: {
         type: 'value',
-        name: '% нормы',
+        name: T.axis,
         min: Y_MIN,
         max: Y_MAX,
         interval: 100,
-        splitLine: { lineStyle: { color: '#e6e8ee' } },
+        splitLine: { lineStyle: { color: LINE_COLOR } },
       },
       series: [normBand(), ...seriesList.map(chartSeries)],
     };

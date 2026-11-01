@@ -10,6 +10,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from med_analyzer.analyte_names import analyte_name
+from med_analyzer.i18n import DEFAULT_LANGUAGE
 from med_analyzer.log import get_logger
 from med_analyzer.models import AnalysisSet, Analyte, Result, User
 from med_analyzer.norm import is_out_of_range, percent_of_norm
@@ -36,14 +38,18 @@ def escape_like(text: str) -> str:
     )
 
 
-def list_analytes(db: Session, user: User, q: str | None) -> list[dict[str, Any]]:
+def list_analytes(
+    db: Session, user: User, q: str | None, lang: str = DEFAULT_LANGUAGE
+) -> list[dict[str, Any]]:
     """List the analytes the user has numeric results for.
 
     Args:
         db: Open session.
         user: The owner of the results.
         q: Case-insensitive substring of the name or the code; empty or
-            ``None`` means no filter.
+            ``None`` means no filter. The name is matched in the language
+            asked for and in Ukrainian, the stored one.
+        lang: ``uk``, ``en`` or ``ru``; the language of the names.
 
     Returns:
         Dictionaries with ``id``, ``code``, ``name`` and ``count`` (the number
@@ -56,9 +62,10 @@ def list_analytes(db: Session, user: User, q: str | None) -> list[dict[str, Any]
         .join(AnalysisSet, AnalysisSet.id == Result.set_id)
         .where(AnalysisSet.user_id == user.id, Result.value.is_not(None))
         .group_by(Analyte.id)
-        .order_by(Analyte.name, Analyte.id)
-        .limit(MAX_ANALYTES)
     )
+    if lang != DEFAULT_LANGUAGE:
+        return _list_translated(db, query, q, lang)
+    query = query.order_by(Analyte.name, Analyte.id).limit(MAX_ANALYTES)
     if q:
         pattern = f'%{escape_like(q)}%'
         query = query.where(
@@ -69,6 +76,34 @@ def list_analytes(db: Session, user: User, q: str | None) -> list[dict[str, Any]
         {'id': id_, 'code': code, 'name': name, 'count': total}
         for id_, code, name, total in db.execute(query)
     ]
+
+
+def _list_translated(
+    db: Session, query: Any, q: str | None, lang: str
+) -> list[dict[str, Any]]:
+    """Filter and order the analytes by their names in another language.
+
+    The database knows only the Ukrainian names, so this works in Python on
+    the (short) list of the analytes the user has.
+
+    Args:
+        db: Open session.
+        query: The unfiltered, unordered analyte query of ``list_analytes``.
+        q: Case-insensitive substring to match, or ``None``.
+        lang: Language of the names.
+
+    Returns:
+        The same dictionaries as ``list_analytes``.
+    """
+    needle = (q or '').casefold()
+    items = []
+    for id_, code, stored, total in db.execute(query):
+        name = analyte_name(code, stored, lang)
+        haystack = f'{name}\n{stored}\n{code}'.casefold()
+        if needle in haystack:
+            items.append({'id': id_, 'code': code, 'name': name, 'count': total})
+    items.sort(key=lambda item: (item['name'].casefold(), item['id']))
+    return items[:MAX_ANALYTES]
 
 
 def _point(row: Any) -> dict[str, Any]:
@@ -149,12 +184,15 @@ def _delta(current: Any, previous: Any) -> float | None:
     return float(current.value - previous.value)
 
 
-def _table_row(rows: list[Any], points: list[dict[str, Any]]) -> dict[str, Any]:
+def _table_row(
+    rows: list[Any], points: list[dict[str, Any]], lang: str
+) -> dict[str, Any]:
     """Build the comparison table row of one analyte.
 
     Args:
         rows: Result rows of the analyte, oldest first.
         points: Their points, in the same order.
+        lang: Language of the analyte name.
 
     Returns:
         The latest value with its range and the value before it.
@@ -164,7 +202,7 @@ def _table_row(rows: list[Any], points: list[dict[str, Any]]) -> dict[str, Any]:
     before = points[-2] if previous is not None else None
     return {
         'analyte_id': current.analyte_id,
-        'name': current.name,
+        'name': analyte_name(current.code, current.name, lang),
         'code': current.code,
         'current': point['value'],
         'current_str': point['value_str'],
@@ -183,7 +221,7 @@ def _table_row(rows: list[Any], points: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def build_dynamics(
-    db: Session, user: User, analyte_ids: list[int]
+    db: Session, user: User, analyte_ids: list[int], lang: str = DEFAULT_LANGUAGE
 ) -> dict[str, list[dict[str, Any]]]:
     """Build the chart series and the comparison table.
 
@@ -194,6 +232,7 @@ def build_dynamics(
         db: Open session.
         user: The owner of the results.
         analyte_ids: Requested analytes; duplicates are collapsed.
+        lang: Language of the analyte names.
 
     Returns:
         ``{'series': [...], 'table': [...]}`` with one entry per analyte that
@@ -215,13 +254,13 @@ def build_dynamics(
         series.append(
             {
                 'analyte_id': analyte_id,
-                'name': rows[0].name,
+                'name': analyte_name(rows[0].code, rows[0].name, lang),
                 'code': rows[0].code,
                 # The latest unit, since that is what the table row shows.
                 'unit': rows[-1].unit,
                 'points': points,
             }
         )
-        table.append(_table_row(rows, points))
+        table.append(_table_row(rows, points, lang))
     logger.debug('Dynamics built: analytes=%d', len(series))
     return {'series': series, 'table': table}

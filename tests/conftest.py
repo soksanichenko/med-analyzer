@@ -96,5 +96,6 @@ def client(web_env: None, db: Session) -> Iterator[TestClient]:
         yield db
 
     app.dependency_overrides[get_db] = _get_db
-    with TestClient(app) as test_client:
+    # Most tests check the Russian texts; the language tests change the cookie.
+    with TestClient(app, cookies={'lang': 'ru'}) as test_client:
         yield test_client

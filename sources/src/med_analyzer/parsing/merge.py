@@ -8,6 +8,7 @@ precisions, and the first occurrence always wins.
 import re
 from decimal import ROUND_HALF_UP, Decimal
 
+from med_analyzer.i18n import encode_msg, msg
 from med_analyzer.parsing.types import ParsedResult
 
 
@@ -60,9 +61,10 @@ def duplicate_warning(label: str, first: str, second: str) -> str:
         second: Displayed repeated value (the one dropped).
 
     Returns:
-        The warning text in Russian, as shown to the user.
+        The warning as stored with the set (a serialised message, rendered
+        in the reader's language).
     """
-    return f'Повтор показателя «{label}» с другим значением: {first} и {second}'
+    return encode_msg(msg('warn.duplicate_value', label, first, second))
 
 
 def merge_duplicates(rows: list[ParsedResult]) -> tuple[list[ParsedResult], list[str]]:

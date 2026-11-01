@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from med_analyzer.parsing.lab_service import parse_lab_service
+from med_analyzer.parsing.merge import duplicate_warning
 from med_analyzer.parsing.primitives import age_in_months
 from med_analyzer.parsing.reference import parse_reference, select_reference
 from med_analyzer.parsing.types import Page, ParsedResult, ParsedSet, ParseError
@@ -152,7 +153,7 @@ def test_duplicate_with_different_value_warns_and_keeps_first(
     second_hgb = _index(pages[0], '(HGB)', nth=1)
     value = _word_on_row_of(pages[0], second_hgb, '191')
     result = parse_lab_service(_retext(pages, 0, value, '181'))
-    assert result.warnings == ['Повтор показателя «HGB» с другим значением: 191 и 181']
+    assert result.warnings == [duplicate_warning('HGB', '191', '181')]
     assert len(result.results) == 27
     assert _by_abbr(result, 'HGB').value == Decimal(191)
 

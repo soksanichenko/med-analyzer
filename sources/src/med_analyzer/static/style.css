@@ -1,15 +1,17 @@
+/* The palette of the Discord SSO portal (meow-elite.club). */
 :root {
-  --bg: #f6f7f9;
-  --fg: #1d2330;
-  --muted: #5d6677;
-  --accent: #2563eb;
-  --error: #b42318;
-  --border: #d5d9e1;
-  --card: #ffffff;
-  --warn: #d4a017;
-  --warn-bg: #fff8e1;
-  --warn-fg: #7a5b00;
-  --out-bg: #fdecea;
+  color-scheme: dark;
+  --bg: #0f1115;
+  --card: #171a21;
+  --border: #2a2f3a;
+  --fg: #e6e8ec;
+  --muted: #9aa1ad;
+  --accent: #5865f2;
+  --error: #ff6b6b;
+  --warn: #c9a227;
+  --warn-bg: #2a2410;
+  --warn-fg: #e6c36a;
+  --out-bg: #2c1a1d;
 }
 
 * { box-sizing: border-box; }
@@ -23,17 +25,66 @@ body {
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem 1rem;
   padding: 0.5rem 1rem;
   background: var(--card);
   border-bottom: 1px solid var(--border);
 }
 
 .topbar nav { display: flex; gap: 1.25rem; }
-.topbar a { color: var(--muted); text-decoration: none; padding: 0.25rem 0; }
-.topbar a.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
-.avatar { border-radius: 50%; }
+.topbar nav a { color: var(--muted); text-decoration: none; padding: 0.25rem 0; }
+.topbar nav a:hover { color: var(--fg); }
+.topbar nav a.active { color: var(--fg); border-bottom: 2px solid var(--accent); }
+
+.header-actions { display: flex; align-items: center; gap: 0.5rem; }
+.lang-selector select {
+  padding: 0.35rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.button-link {
+  padding: 0.35rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.button-link:hover { border-color: var(--accent); }
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 4px 6px 4px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.user-menu .avatar, .user-menu .avatar-placeholder {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+.user-menu .avatar-placeholder { background: var(--border); }
+.user-menu form { display: flex; align-items: center; margin: 0; }
+.user-menu button {
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.user-menu button:hover { color: var(--fg); }
 
 main { max-width: 48rem; margin: 0 auto; padding: 1rem; }
 .hint { color: var(--muted); }
@@ -55,8 +106,10 @@ fieldset label { margin-right: 1rem; }
 
 input[type='date'] {
   padding: 0.4rem;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
+  color: var(--fg);
   font: inherit;
 }
 
@@ -131,7 +184,7 @@ a { color: var(--accent); }
 .note { color: var(--warn-fg); }
 
 .delete-form { margin-top: 1.5rem; }
-button.danger { background: var(--error); }
+button.danger { background: var(--error); color: #1a0d0f; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Dynamics page */
@@ -140,8 +193,10 @@ main:has(.dynamics) { max-width: 64rem; }
 .picker input[type='search'] {
   max-width: 24rem;
   padding: 0.4rem;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
+  color: var(--fg);
   font: inherit;
 }
 .options {

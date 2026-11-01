@@ -33,7 +33,8 @@ from med_analyzer.upload_body import (
     read_upload,
 )
 from med_analyzer.uploads import PROFILE_REQUIRED
-from med_analyzer.web import lab_name, num, ru_date
+from med_analyzer.i18n import format_date, render
+from med_analyzer.web import lab_name, num
 
 FIXTURES = Path(__file__).parent / 'fixtures'
 USER_ID = '100000000000000001'
@@ -541,11 +542,12 @@ def test_without_a_profile_the_banner_shows_and_upload_is_refused(
     html = client.get('/sets', headers=as_user()).text
     response = upload(client)
 
-    assert PROFILE_REQUIRED in html
+    required = render('ru', PROFILE_REQUIRED)
+    assert required in html
     assert 'href="/profile"' in html
     assert 'disabled' in html
     assert response.status_code == 422
-    assert PROFILE_REQUIRED in response.text
+    assert required in response.text
     assert count(db, AnalysisSet) == 0
     assert stored_files(client) == []
 
@@ -555,7 +557,7 @@ def test_profile_banner_is_absent_with_a_profile(
 ) -> None:
     html = client.get('/sets', headers=as_user()).text
 
-    assert PROFILE_REQUIRED not in html
+    assert render('ru', PROFILE_REQUIRED) not in html
     assert 'disabled' not in html
 
 
@@ -678,9 +680,13 @@ def test_integrity_error_is_409_with_a_retry_message(
 
 
 def test_filters() -> None:
-    assert ru_date(date(2021, 10, 14)) == '14 октября 2021'
-    assert ru_date(date(2025, 1, 31)) == '31 января 2025'
-    assert ru_date(date(2025, 12, 1)) == '1 декабря 2025'
+    assert format_date('ru', date(2021, 10, 14)) == '14 октября 2021'
+    assert format_date('ru', date(2025, 1, 31)) == '31 января 2025'
+    assert format_date('ru', date(2025, 12, 1)) == '1 декабря 2025'
+    assert format_date('uk', date(2021, 10, 14)) == '14 жовтня 2021'
+    assert format_date('en', date(2021, 10, 14)) == 'October 14, 2021'
+    assert num(Decimal('6.40'), 'en') == '6.40'
+    assert num(Decimal('6.40'), 'ru') == '6,40'
     assert num(Decimal('6.40')) == '6,40'
     assert num(Decimal('125')) == '125'
     assert num(Decimal('1E+2')) == '100'
@@ -689,5 +695,7 @@ def test_filters() -> None:
     assert num(None) == ''
     assert num('abc') == 'abc'
     assert lab_name('lab_service') == 'Lab Service'
-    assert lab_name('synevo') == 'Синево'
+    assert lab_name('synevo', 'ru') == 'Синево'
+    assert lab_name('synevo', 'uk') == 'Сінево'
+    assert lab_name('synevo', 'en') == 'Synevo'
     assert lab_name('other') == 'other'

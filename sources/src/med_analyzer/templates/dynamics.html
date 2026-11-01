@@ -1,26 +1,27 @@
 {% extends 'base.html' %}
-{% block title %}Динамика{% endblock %}
+{% block title %}{{ t('dyn.title') }}{% endblock %}
 {% block content %}
-<h1>Динамика</h1>
+<h1>{{ t('dyn.title') }}</h1>
 <div id="dynamics" class="dynamics">
-  <p id="dyn-empty-data" class="hint" hidden>Пока нет числовых результатов. <a href="/sets">Загрузите PDF с анализами</a>.</p>
+  <p id="dyn-empty-data" class="hint" hidden>{{ t('dyn.no_data') }} <a href="/sets">{{ t('dyn.upload_link') }}</a>.</p>
   <p id="dyn-error" class="error" role="alert" hidden></p>
   <section id="dyn-picker" class="picker">
-    <label for="dyn-search">Показатель</label>
-    <input id="dyn-search" type="search" placeholder="Начните вводить название" autocomplete="off" maxlength="100">
+    <label for="dyn-search">{{ t('dyn.analyte') }}</label>
+    <input id="dyn-search" type="search" placeholder="{{ t('dyn.search_placeholder') }}" autocomplete="off" maxlength="100">
     <ul id="dyn-options" class="options" hidden></ul>
-    <ul id="dyn-chips" class="chips" aria-label="Выбранные показатели"></ul>
+    <ul id="dyn-chips" class="chips" aria-label="{{ t('dyn.selected_aria') }}"></ul>
   </section>
-  <p id="dyn-hint" class="hint">Выберите один или несколько показателей.</p>
-  <div id="dyn-chart" class="chart" role="img" aria-label="График динамики в процентах нормы" hidden></div>
-  <p id="dyn-legend" class="hint" hidden>Шкала: 0 % — нижняя граница нормы, 100 % — верхняя. Зелёная полоса — норма; красные точки — вне нормы; треугольник на краю — значение за пределами шкалы.</p>
+  <p id="dyn-hint" class="hint">{{ t('dyn.pick_hint') }}</p>
+  <div id="dyn-chart" class="chart" role="img" aria-label="{{ t('dyn.chart_aria') }}" hidden></div>
+  <p id="dyn-legend" class="hint" hidden>{{ t('dyn.legend') }}</p>
   <table id="dyn-table" class="results dyn-table" hidden>
     <thead>
-      <tr><th>Показатель</th><th>Сейчас</th><th>Норма</th><th>Было</th><th>Изменение</th></tr>
+      <tr><th>{{ t('dyn.analyte') }}</th><th>{{ t('dyn.col_now') }}</th><th>{{ t('detail.col_norm') }}</th><th>{{ t('dyn.col_before') }}</th><th>{{ t('dyn.col_change') }}</th></tr>
     </thead>
     <tbody id="dyn-rows"></tbody>
   </table>
 </div>
-<script src="/static/vendor/echarts.min.js"></script>
-<script src="/static/dynamics.js"></script>
+<script type="application/json" id="dyn-i18n">{{ js_strings|tojson }}</script>
+<script src="{{ static_url('vendor/echarts.min.js') }}"></script>
+<script src="{{ static_url('dynamics.js') }}"></script>
 {% endblock %}
