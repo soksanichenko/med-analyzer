@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from med_analyzer.analytes import match_analyte
 from med_analyzer.config import AppConfig
+from med_analyzer.i18n import Msg, encode_msg, msg
 from med_analyzer.log import get_logger
 from med_analyzer.models import AnalysisSet, Result, SetFile, User
 from med_analyzer.parsing import parse_pdf
@@ -34,43 +35,37 @@ from med_analyzer.storage import delete_pdf, save_pdf
 
 logger = get_logger(__name__)
 
-PROFILE_REQUIRED = 'Сначала заполните профиль: пол и дата рождения'
-NOT_A_PDF = 'Файл не похож на PDF'
-ALREADY_UPLOADED = 'Этот файл уже загружен'
-DATE_DIFFERS = 'Дата в файле отличается от даты набора'
-NAME_DIFFERS = 'Имя в файле отличается от прежнего'
+PROFILE_REQUIRED = msg('upload.profile_required')
+NOT_A_PDF = msg('upload.not_pdf')
+ALREADY_UPLOADED = msg('upload.already')
+DATE_DIFFERS = msg('upload.date_differs')
+NAME_DIFFERS = msg('upload.name_differs')
 PDF_MAGIC = b'%PDF-'
 
-# Russian reasons for the fixed English messages of ``ParseError``; matched by
-# prefix, in order. Any other message gets the generic reason with the original.
+# User-facing reasons for the fixed English messages of ``ParseError``; matched
+# by prefix, in order. Any other message gets the generic reason with the original.
 PARSE_ERROR_REASONS = (
-    (
-        'Unknown report format',
-        'Не удалось определить лабораторию: поддерживаются отчёты Lab Service и Синево',
-    ),
-    ('Ambiguous report format', 'Не удалось однозначно определить лабораторию'),
-    (
-        'The PDF has no text layer',
-        'В PDF нет текстового слоя (сканы не поддерживаются)',
-    ),
-    ('Cannot read the PDF', 'Не удалось прочитать PDF'),
-    ('The PDF has too many', 'В PDF слишком много страниц или текста'),
+    ('Unknown report format', msg('upload.unknown_format')),
+    ('Ambiguous report format', msg('upload.ambiguous_format')),
+    ('The PDF has no text layer', msg('upload.no_text_layer')),
+    ('Cannot read the PDF', msg('upload.cannot_read')),
+    ('The PDF has too many', msg('upload.too_many')),
 )
 
 
-def too_large_reason(config: AppConfig) -> str:
+def too_large_reason(config: AppConfig) -> Msg:
     """Return the user-facing message for a file over the size limit.
 
     Args:
         config: Application settings (size cap).
 
     Returns:
-        The message in Russian.
+        The message.
     """
-    return f'Файл слишком большой (максимум {config.max_upload_mb} МБ)'
+    return msg('upload.too_large', config.max_upload_mb)
 
 
-def parse_error_reason(error: ParseError) -> str:
+def parse_error_reason(error: ParseError) -> Msg:
     """Translate a parser error into the message shown to the user.
 
     Args:
@@ -78,31 +73,31 @@ def parse_error_reason(error: ParseError) -> str:
             description with at most page and row numbers, never report text.
 
     Returns:
-        The reason in Russian.
+        The reason.
     """
     message = str(error)
     for prefix, reason in PARSE_ERROR_REASONS:
         if message.startswith(prefix):
             return reason
-    return f'Не удалось разобрать PDF ({message})'
+    return msg('upload.parse_failed', message)
 
 
 class UploadRejected(Exception):
     """An upload refused for a reason that can be shown to the user.
 
     Attributes:
-        reason: User-facing explanation in Russian.
+        reason: User-facing explanation.
         existing_set_id: The set that already holds the same file, if any.
     """
 
-    def __init__(self, reason: str, existing_set_id: int | None = None) -> None:
+    def __init__(self, reason: Msg, existing_set_id: int | None = None) -> None:
         """Create the rejection.
 
         Args:
-            reason: User-facing explanation in Russian.
+            reason: User-facing explanation.
             existing_set_id: The set that already holds the same file, if any.
         """
-        super().__init__(reason)
+        super().__init__(reason.key)
         self.reason = reason
         self.existing_set_id = existing_set_id
 
@@ -350,13 +345,13 @@ def _save_parsed(
         )
         db.add(analysis_set)
     elif parsed.collected_on != analysis_set.collected_on:
-        warnings.append(DATE_DIFFERS)
+        warnings.append(encode_msg(DATE_DIFFERS))
 
     if parsed.patient_name is not None:
         if user.last_patient_name is None:
             user.last_patient_name = parsed.patient_name
         elif not _same_name(user.last_patient_name, parsed.patient_name):
-            warnings.append(NAME_DIFFERS)
+            warnings.append(encode_msg(NAME_DIFFERS))
         elif len(parsed.patient_name) > len(user.last_patient_name):
             # The same person in a fuller form (full name vs initials).
             user.last_patient_name = parsed.patient_name
@@ -400,8 +395,9 @@ def _add_results(
                 # Two spellings in one report resolving to one analyte hint at
                 # a matching problem even when the values agree.
                 warnings.append(
-                    f'Повтор показателя «{row.raw_name}» пропущен: '
-                    f'тот же показатель, что и «{first.raw_name}»'
+                    encode_msg(
+                        msg('warn.duplicate_skipped', row.raw_name, first.raw_name)
+                    )
                 )
             continue
         ref_low, ref_high = _select(

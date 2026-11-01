@@ -5,7 +5,6 @@ import traceback
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import date
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Form, Request, Response
@@ -16,19 +15,24 @@ from sqlalchemy.orm import Session
 from med_analyzer.analytes import seed_analytes
 from med_analyzer.config import get_config
 from med_analyzer.db import get_db, make_session_factory
-from med_analyzer.deps import RequestRefused, avatar_url, current_user, same_origin
+from med_analyzer.deps import (
+    RequestRefused,
+    current_user,
+    same_origin,
+    session_cookie_domain,
+)
+from med_analyzer.i18n import Msg, msg
 from med_analyzer.log import configure_logging, get_logger
 from med_analyzer.models import User
 from med_analyzer.routes_dynamics import router as dynamics_router
 from med_analyzer.routes_sets import router as sets_router
 from med_analyzer.uploads import recompute_references
-from med_analyzer.web import templates
+from med_analyzer.web import STATIC_DIR, templates
 
 logger = get_logger(__name__)
 
-# Resolved from the package so they are found in the Docker image as well.
-PACKAGE_DIR = Path(__file__).parent
-STATIC_DIR = PACKAGE_DIR / 'static'
+# The cookie the portal bridges to this domain; logging out removes it.
+SESSION_COOKIE = 'zw_session'
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
@@ -49,10 +53,10 @@ SEXES = ('M', 'F')
 EARLIEST_BIRTH_DATE = date(1900, 1, 1)
 # Not ``date.fromisoformat`` alone: it also takes ``20900101`` and week dates.
 ISO_DATE_PATTERN = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
-SEX_ERROR = 'Укажите пол: мужской или женский'
-FORMAT_ERROR = 'Введите дату рождения в формате ГГГГ-ММ-ДД'
-FUTURE_ERROR = 'Дата рождения не может быть в будущем'
-PAST_ERROR = 'Дата рождения не может быть раньше 1900 года'
+SEX_ERROR = msg('profile.err_sex')
+FORMAT_ERROR = msg('profile.err_format')
+FUTURE_ERROR = msg('profile.err_future')
+PAST_ERROR = msg('profile.err_past')
 
 
 @asynccontextmanager
@@ -78,7 +82,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-def validate_profile(sex: str, birth_date: str) -> tuple[date | None, str | None]:
+def validate_profile(sex: str, birth_date: str) -> tuple[date | None, Msg | None]:
     """Check the profile form fields.
 
     Args:
@@ -86,7 +90,7 @@ def validate_profile(sex: str, birth_date: str) -> tuple[date | None, str | None
         birth_date: Submitted birth date in ISO format.
 
     Returns:
-        The parsed birth date and ``None``, or ``None`` and a Russian message.
+        The parsed birth date and ``None``, or ``None`` and the message to show.
     """
     if sex not in SEXES:
         return None, SEX_ERROR
@@ -107,7 +111,7 @@ def render_profile(
     request: Request,
     sex: str | None,
     birth_date: str,
-    error: str | None = None,
+    error: Msg | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     """Render the profile form.
@@ -116,7 +120,7 @@ def render_profile(
         request: The incoming request.
         sex: Sex to preselect; anything but ``M``/``F`` selects nothing.
         birth_date: Value of the date field (escaped by the template).
-        error: Russian message shown above the form.
+        error: Message shown above the form.
         status_code: HTTP status of the response.
 
     Returns:
@@ -124,7 +128,6 @@ def render_profile(
     """
     context = {
         'active': 'profile',
-        'avatar_url': avatar_url(request),
         'sex': sex if sex in SEXES else None,
         'birth_date': birth_date,
         'error': error,
@@ -174,6 +177,19 @@ def create_app() -> FastAPI:
     def healthz() -> dict[str, str]:
         """Report liveness without authentication or database access."""
         return {'status': 'ok'}
+
+    @app.post('/logout', dependencies=[Depends(same_origin)])
+    def logout(request: Request) -> RedirectResponse:
+        """Drop the portal's session cookie of this domain and start over.
+
+        This is local to the domain, not a Discord logout: while the portal
+        session is valid, the gate bridges a fresh cookie on the next page.
+        """
+        response = RedirectResponse('/', status_code=303)
+        response.delete_cookie(
+            SESSION_COOKIE, domain=session_cookie_domain(request), path='/'
+        )
+        return response
 
     @app.get('/profile', response_class=HTMLResponse)
     def profile_form(

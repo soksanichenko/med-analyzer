@@ -97,6 +97,26 @@ def avatar_url(request: Request) -> str | None:
     return url if AVATAR_PATTERN.fullmatch(url) else None
 
 
+def session_cookie_domain(request: Request) -> str | None:
+    """Return the domain the portal sets its bridged session cookie on.
+
+    That is the parent of the service's host (``zelgray.cherkasy.ua`` for
+    ``med-analyzer.zelgray.cherkasy.ua``).
+
+    Args:
+        request: The incoming request.
+
+    Returns:
+        The domain, or ``None`` for a host without a parent (``localhost``) or
+        an IP address.
+    """
+    host = request.headers.get('host', '').rsplit(':', 1)[0]
+    labels = host.split('.')
+    if len(labels) < 3 or all(label.isdigit() for label in labels):
+        return None
+    return '.'.join(labels[1:])
+
+
 def same_origin(request: Request) -> None:
     """Refuse state-changing requests that a browser sent from another site.
 

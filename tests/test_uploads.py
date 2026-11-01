@@ -23,6 +23,7 @@ from med_analyzer import uploads
 from med_analyzer.analytes import seed_analytes
 from med_analyzer.config import AppConfig
 from med_analyzer.dynamics import build_dynamics
+from med_analyzer.i18n import encode_msg, render, render_stored
 from med_analyzer.models import AnalysisSet, Analyte, Result, SetFile, User
 from med_analyzer.parsing.lab_service import parse_lab_service
 from med_analyzer.parsing.synevo import parse_synevo
@@ -51,6 +52,11 @@ PDF_B = b'%PDF-1.7 second fake report'
 TEXT_POINTER_ROW = 'Звіт з описом лабораторних показників'
 FAKE_NAME = 'Петренко Петро Петрович'
 OTHER_NAME = 'Сидоренко Сидір Сидорович'
+
+
+def _ru(warnings: list[str]) -> list[str]:
+    """Render the stored warnings of a set in Russian."""
+    return [render_stored('ru', warning) for warning in warnings]
 
 
 def _parse(name: str) -> ParsedSet:
@@ -266,7 +272,7 @@ def test_same_file_twice_is_rejected_with_the_set(
     with pytest.raises(UploadRejected) as caught:
         store_upload(db, user, PDF_A, config)
 
-    assert caught.value.reason == 'Этот файл уже загружен'
+    assert render('ru', caught.value.reason) == 'Этот файл уже загружен'
     assert caught.value.existing_set_id == analysis_set.id
     assert _count(db, SetFile) == 1
     assert len(_files(config.storage_dir)) == 1
@@ -369,7 +375,7 @@ def test_repeated_analyte_on_merge(
     expected = [
         f'Повтор показателя «{row.raw_name}» с другим значением: 4.0 и {repeat_value}'
     ]
-    assert analysis_set.warnings == (expected if warned else [])
+    assert _ru(analysis_set.warnings) == (expected if warned else [])
 
 
 @pytest.mark.parametrize(
@@ -405,7 +411,7 @@ def test_repeated_text_analyte_on_merge(
         f'Повтор показателя «{row.raw_name}» с другим значением: '
         f'negative и {repeat_text}'
     ]
-    assert analysis_set.warnings == (expected if warned else [])
+    assert _ru(analysis_set.warnings) == (expected if warned else [])
 
 
 def test_differing_date_on_merge_keeps_the_set_date(
@@ -425,7 +431,7 @@ def test_differing_date_on_merge_keeps_the_set_date(
 
     assert merged is True
     assert analysis_set.collected_on == first.collected_on
-    assert analysis_set.warnings == ['Дата в файле отличается от даты набора']
+    assert _ru(analysis_set.warnings) == ['Дата в файле отличается от даты набора']
 
 
 def test_without_order_number_every_file_is_its_own_set(
@@ -464,7 +470,7 @@ def test_same_value_under_two_spellings_is_skipped_with_a_russian_note(
 
     analysis_set, _ = store_upload(db, user, PDF_A, config)
 
-    assert analysis_set.warnings == [
+    assert _ru(analysis_set.warnings) == [
         'Повтор показателя «Гемоглобін (HGB)» пропущен: '
         f'тот же показатель, что и «{hgb.raw_name}»'
     ]
@@ -488,7 +494,9 @@ def test_same_analyte_twice_in_one_file_keeps_the_first(
 
     assert [r.raw_name for r in _results(db, analysis_set)] == [hgb.raw_name]
     assert len(analysis_set.warnings) == 1
-    assert analysis_set.warnings[0].startswith('Повтор показателя «Гемоглобін (HGB)»')
+    assert _ru(analysis_set.warnings)[0].startswith(
+        'Повтор показателя «Гемоглобін (HGB)»'
+    )
 
 
 # --- rejections --------------------------------------------------------------
@@ -511,7 +519,10 @@ def test_incomplete_profile_is_rejected(
     with pytest.raises(UploadRejected) as caught:
         store_upload(seeded, user, PDF_A, config)
 
-    assert caught.value.reason == 'Сначала заполните профиль: пол и дата рождения'
+    assert (
+        render('ru', caught.value.reason)
+        == 'Сначала заполните профиль: пол и дата рождения'
+    )
     _assert_nothing_stored(seeded, config)
 
 
@@ -527,7 +538,7 @@ def test_not_a_pdf_is_rejected(
     with pytest.raises(UploadRejected) as caught:
         store_upload(seeded, user, b'not a pdf', config)
 
-    assert caught.value.reason == 'Файл не похож на PDF'
+    assert render('ru', caught.value.reason) == 'Файл не похож на PDF'
     assert caught.value.existing_set_id is None
     _assert_nothing_stored(seeded, config)
 
@@ -546,7 +557,7 @@ def test_oversized_file_is_rejected(
     with pytest.raises(UploadRejected) as caught:
         store_upload(seeded, user, b'%PDF-' + b'0' * (limit - 4), small)
 
-    assert caught.value.reason == 'Файл слишком большой (максимум 1 МБ)'
+    assert render('ru', caught.value.reason) == 'Файл слишком большой (максимум 1 МБ)'
     _assert_nothing_stored(seeded, config)
 
     # Exactly at the limit is accepted.
@@ -618,7 +629,7 @@ def test_parse_errors_are_shown_in_russian_and_logged_in_english(
     with caplog.at_level(logging.INFO), pytest.raises(UploadRejected) as caught:
         store_upload(seeded, user, PDF_A, config)
 
-    assert caught.value.reason == reason
+    assert render('ru', caught.value.reason) == reason
     assert message in caplog.text
     _assert_nothing_stored(seeded, config)
 
@@ -708,7 +719,7 @@ def test_failed_upload_keeps_a_file_another_row_refers_to(
     with pytest.raises(UploadRejected) as caught:
         store_upload(db, user, PDF_A, config)
 
-    assert caught.value.reason == 'Этот файл уже загружен'
+    assert render('ru', caught.value.reason) == 'Этот файл уже загружен'
     assert caught.value.existing_set_id == analysis_set.id
     assert stored.read_bytes() == PDF_A
     assert _count(db, AnalysisSet) == 1
@@ -888,7 +899,7 @@ def test_patient_name_is_remembered_and_a_change_warned(
     assert first_set.patient_name == FAKE_NAME
     assert first_set.warnings == []
     assert second_set.patient_name == OTHER_NAME
-    assert second_set.warnings == ['Имя в файле отличается от прежнего']
+    assert _ru(second_set.warnings) == ['Имя в файле отличается от прежнего']
     db.refresh(user)
     assert user.last_patient_name == FAKE_NAME
 
@@ -956,7 +967,7 @@ def test_different_person_still_warns_after_a_short_form(
     store_upload(db, user, PDF_A, config)
     second, _ = store_upload(db, user, PDF_B, config)
 
-    assert second.warnings == [uploads.NAME_DIFFERS]
+    assert second.warnings == [encode_msg(uploads.NAME_DIFFERS)]
 
 
 @pytest.mark.parametrize(
@@ -1125,6 +1136,7 @@ def test_two_labs_chain_from_upload_to_dynamics(
     # The same data through the HTTP API.
     headers = {'X-Discord-User-Id': discord_id}
     query = '&'.join(f'analyte_id={analyte_id}' for analyte_id in ids.values())
+    client.cookies.set('lang', 'uk')  # build_dynamics above names them in Ukrainian
     response = client.get(f'/api/dynamics?{query}', headers=headers)
     assert response.status_code == 200
     assert response.json() == body

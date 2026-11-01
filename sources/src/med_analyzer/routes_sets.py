@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from med_analyzer.config import AppConfig, get_config
 from med_analyzer.db import get_db
-from med_analyzer.deps import RequestRefused, avatar_url, current_user, same_origin
+from med_analyzer.deps import RequestRefused, current_user, same_origin
+from med_analyzer.i18n import Msg, msg
 from med_analyzer.log import get_logger
 from med_analyzer.models import AnalysisSet, Result, SetFile, User
 from med_analyzer.norm import is_out_of_range
@@ -38,8 +39,8 @@ router = APIRouter()
 
 # The largest value of the integer primary key; anything above is no set.
 MAX_SET_ID = 2**31 - 1
-NO_FILE = 'Выберите PDF-файл'
-SAVE_FAILED = 'Не удалось сохранить файл, попробуйте ещё раз'
+NO_FILE = msg('upload.no_file')
+SAVE_FAILED = msg('upload.save_failed')
 FLAG_DIRECTIONS = ('high', 'low')
 
 
@@ -162,7 +163,7 @@ def render_sets(
     request: Request,
     db: Session,
     user: User,
-    error: str | None = None,
+    error: Msg | None = None,
     existing_set_id: int | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
@@ -172,7 +173,7 @@ def render_sets(
         request: The incoming request.
         db: Open session.
         user: The caller.
-        error: Russian message shown above the upload form.
+        error: Message shown above the upload form.
         existing_set_id: Set to link to from the message.
         status_code: HTTP status of the response.
 
@@ -182,7 +183,6 @@ def render_sets(
     cards = load_cards(db, user)
     context = {
         'active': 'sets',
-        'avatar_url': avatar_url(request),
         'profile_complete': user.sex is not None and user.birth_date is not None,
         'groups': [
             (day, list(group))
@@ -290,7 +290,6 @@ def set_detail(
     ).all()
     context = {
         'active': 'sets',
-        'avatar_url': avatar_url(request),
         'set': analysis_set,
         'rows': build_rows(list(results)),
         'file_count': len(analysis_set.files),

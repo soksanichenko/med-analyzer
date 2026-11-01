@@ -11,8 +11,9 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from med_analyzer.db import get_db
-from med_analyzer.deps import avatar_url, current_user
+from med_analyzer.deps import current_user
 from med_analyzer.dynamics import build_dynamics, list_analytes
+from med_analyzer.i18n import detect_language
 from med_analyzer.models import User
 from med_analyzer.web import templates
 
@@ -31,22 +32,24 @@ def dynamics_page(
     request: Request, user: Annotated[User, Depends(current_user)]
 ) -> HTMLResponse:
     """Show the analyte picker, the chart and the comparison table."""
-    context = {'active': 'dynamics', 'avatar_url': avatar_url(request)}
+    context = {'active': 'dynamics'}
     return templates.TemplateResponse(request, 'dynamics.html', context)
 
 
 @router.get('/api/analytes')
 def analytes(
+    request: Request,
     user: Annotated[User, Depends(current_user)],
     db: Annotated[Session, Depends(get_db)],
     q: Annotated[str | None, Query(max_length=MAX_SEARCH_LENGTH)] = None,
 ) -> list[dict[str, Any]]:
     """List the analytes the user has numeric results for, filtered by ``q``."""
-    return list_analytes(db, user, q)
+    return list_analytes(db, user, q, detect_language(request))
 
 
 @router.get('/api/dynamics')
 def dynamics(
+    request: Request,
     user: Annotated[User, Depends(current_user)],
     db: Annotated[Session, Depends(get_db)],
     analyte_id: Annotated[
@@ -54,4 +57,4 @@ def dynamics(
     ] = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Return the series and the table of the chosen analytes."""
-    return build_dynamics(db, user, analyte_id or [])
+    return build_dynamics(db, user, analyte_id or [], detect_language(request))

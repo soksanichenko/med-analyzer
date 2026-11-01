@@ -10,6 +10,7 @@ import subprocess
 from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -364,6 +365,7 @@ def test_analytes_list_only_numeric_own_results(
     )
     add_set(db, owner, date(2025, 2, 1), {'HGB': hgb('141')})
 
+    client.cookies.set('lang', 'uk')
     response = client.get('/api/analytes', headers=as_user())
 
     assert response.status_code == 200
@@ -431,6 +433,21 @@ def test_dynamics_routes_need_an_identity(client: TestClient, path: str) -> None
     assert client.get(path).status_code == 401
 
 
+class ScriptCollector(HTMLParser):
+    """Collect the attributes of every ``<script>`` tag that has no ``src``."""
+
+    def __init__(self) -> None:
+        """Start with no scripts seen."""
+        super().__init__()
+        self.inline: list[dict[str, str | None]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        """Record a script tag without a source."""
+        found = dict(attrs)
+        if tag == 'script' and 'src' not in found:
+            self.inline.append(found)
+
+
 def test_page_links_the_scripts_and_has_no_inline_script(
     client: TestClient, owner: User
 ) -> None:
@@ -438,11 +455,13 @@ def test_page_links_the_scripts_and_has_no_inline_script(
 
     assert response.status_code == 200
     html = response.text
-    assert 'src="/static/vendor/echarts.min.js"' in html
-    assert 'src="/static/dynamics.js"' in html
+    assert re.search(r'src="/static/vendor/echarts\.min\.js\?v=[0-9a-f]{8}"', html)
+    assert re.search(r'src="/static/dynamics\.js\?v=[0-9a-f]{8}"', html)
     assert html.index('echarts.min.js') < html.index('dynamics.js')
-    assert re.findall(r'<script(?![^>]*\bsrc=)[^>]*>', html) == []
-    assert re.findall(r'<script[^>]*>([^<]+)</script>', html) == []
+    # The only script without a source is the JSON of texts, which never runs.
+    collector = ScriptCollector()
+    collector.feed(html)
+    assert collector.inline == [{'type': 'application/json', 'id': 'dyn-i18n'}]
     assert ' onclick=' not in html and 'javascript:' not in html
     assert 'class="active"' in html
     assert response.headers['cache-control'] == 'no-store'

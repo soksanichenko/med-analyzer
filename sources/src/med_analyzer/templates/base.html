@@ -1,24 +1,42 @@
 <!doctype html>
-<html lang="ru">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Анализы{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <title>{% block title %}{{ t('sets.title') }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ static_url('style.css') }}">
 </head>
 <body>
   <header class="topbar">
     <nav>
-      <a href="/sets"{% if active == 'sets' %} class="active"{% endif %}>Анализы</a>
-      <a href="/dynamics"{% if active == 'dynamics' %} class="active"{% endif %}>Динамика</a>
-      <a href="/profile"{% if active == 'profile' %} class="active"{% endif %}>Профиль</a>
+      <a href="/sets"{% if active == 'sets' %} class="active"{% endif %}>{{ t('nav.sets') }}</a>
+      <a href="/dynamics"{% if active == 'dynamics' %} class="active"{% endif %}>{{ t('nav.dynamics') }}</a>
+      <a href="/profile"{% if active == 'profile' %} class="active"{% endif %}>{{ t('nav.profile') }}</a>
     </nav>
-    {% if avatar_url %}
-    <img class="avatar" src="{{ avatar_url }}" alt="" width="32" height="32" referrerpolicy="no-referrer">
-    {% endif %}
+    <div class="header-actions">
+      <div class="lang-selector">
+        <select id="lang-select" aria-label="{{ t('header.language') }}">
+          <option value="uk"{% if lang == 'uk' %} selected{% endif %}>🇺🇦 UK</option>
+          <option value="en"{% if lang == 'en' %} selected{% endif %}>🇬🇧 EN</option>
+          <option value="ru"{% if lang == 'ru' %} selected{% endif %}>🇷🇺 RU</option>
+        </select>
+      </div>
+      <a class="button-link" href="{{ portal_url }}">{{ t('header.portal') }}</a>
+      <div class="user-menu">
+        {% if avatar_url %}
+        <img class="avatar" src="{{ avatar_url }}" alt="" width="28" height="28" referrerpolicy="no-referrer">
+        {% else %}
+        <span class="avatar-placeholder"></span>
+        {% endif %}
+        <form action="/logout" method="post">
+          <button type="submit">{{ t('header.logout') }}</button>
+        </form>
+      </div>
+    </div>
   </header>
   <main>
     {% block content %}{% endblock %}
   </main>
+  <script src="{{ static_url('header.js') }}"></script>
 </body>
 </html>

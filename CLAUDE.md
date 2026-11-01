@@ -23,7 +23,8 @@ med-analyzer/
 │   ├── alembic.ini
 │   ├── requirements.txt            # runtime dependencies, fully pinned
 │   ├── scripts/dump_words.py       # PDF -> anonymised word fixture
-│   └── src/med_analyzer/           # FastAPI app: parsing/, routes_*.py, alembic/, templates/, static/
+│   └── src/med_analyzer/           # FastAPI app: parsing/, routes_*.py, alembic/, templates/, static/,
+│                                   #   i18n.py + messages.py + analyte_names.py (interface language)
 ├── tests/                          # pytest (testcontainers PostgreSQL, needs Docker)
 ├── docs/
 │   ├── deployment-checklist.md     # first deploy: infra prerequisites, order, risks, rollback
@@ -45,6 +46,28 @@ docker build -t med-analyzer:test sources     # container image
 
 Lab report PDFs (`*.pdf`) are personal data: git-ignored, excluded from the
 image and from the Ansible source sync. Never commit them.
+
+## Interface language and header
+
+The UI is Ukrainian, English or Russian (`LANGUAGES` in `i18n.py`). The language
+is the `lang` cookie set by the picker in the header (`static/header.js`), else
+the browser's `Accept-Language`, else Ukrainian; pages are `no-store`, so it never
+leaks through a cache. Texts live in `messages.py` (`{0}` placeholders; a test
+keeps the three catalogs identical in keys and placeholders); the `js.*` entries
+are handed to `dynamics.js` as a JSON block. Messages created away from a request
+(upload errors, warnings stored in `analysis_sets.warnings`) are `Msg` values; a
+stored warning is the JSON of one and a plain string (older rows) is shown as is.
+Analyte names are Ukrainian in the database; English and Russian ones come from
+`analyte_names.py` (a test checks it covers the seed).
+
+The header has the portal link, the language picker and the user's Discord avatar
+with a log-out button (`POST /logout` drops the portal's `zw_session` cookie of
+the parent domain; the portal re-bridges while its own session is valid). The page
+uses the portal's dark palette.
+
+Static files are linked with `static_url()`, which adds `?v=<first 8 hex digits of
+the MD5 of the file>`, so a changed file is never served stale from a browser or
+Cloudflare. Use it for every CSS/JS/image link in a template.
 
 ## Deployment (Ansible)
 
