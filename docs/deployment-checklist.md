@@ -1,8 +1,9 @@
 # Deployment checklist
 
 First deploy of med-analyzer to the home server, in the order it has to happen.
-Nothing here has been applied: every step that touches another repository, the
-server, Infisical, the portal or GitHub is yours to run.
+The deploy and the infra entries have been applied (2026-10-31); sections 1 and 2
+stay as the record of what a fresh setup needs. Every step that touches another
+repository, the server, Infisical, the portal or GitHub is the owner's to run.
 
 The Ansible role (`ansible/roles/med-analyzer`) builds the image on the server,
 runs the container, deploys the nginx location (everything behind the Discord
@@ -178,18 +179,14 @@ refused by the gate.
 6. **Host uid 1000 can read the uploads.** The data directory is owned by uid
    1000 with mode `0700`; whichever host account has uid 1000 can read the lab
    reports. Check with `getent passwd 1000`.
-7. **SELinux.** The data directory is a plain bind mount (no `:z`). If
-   `getenforce` prints `Enforcing`, the container may get "permission denied" on
-   `/data`; the app then fails on the first upload (health stays green). Check
-   `ausearch -m avc -ts recent` after the first upload.
-8. **No backup of this service (found while reading infra).** infra's `backup`
-   playbook targets only the `vds` host group; no backup variables exist in the
-   home-server inventory. The `med-analyzer` database and the uploaded PDFs on
-   the home server are therefore not covered by the restic backups. Decide
-   whether to extend infra's backup to the home server, or take dumps by hand
-   (section 5). Minimum recommendation: a nightly cron job on the server that
-   runs the `pg_dump` from section 5 and a `tar` of `/opt/docker/med-analyzer`,
-   keeping the copies on another machine.
+7. **SELinux.** The data directory is a plain bind mount (no `:z`). On the home
+   server `getenforce` prints `Enforcing`, yet the first uploads (2026-11-01)
+   worked and `ausearch -m avc` showed no denials. If a future change makes the
+   app fail on `/data` with "permission denied", check
+   `ausearch -m avc -ts recent` first.
+8. **Backups.** The database and the uploads are covered by infra's `backup`
+   role on the home server (section 5). The restic repository is separate from
+   the VDS one.
 9. **Portal dependency.** The registration task calls the portal's API from the
    server on every deploy and fails the deploy if the portal is down or the
    token is wrong (the error output is hidden by `no_log`; test the token and
@@ -234,15 +231,66 @@ reload nginx (`docker exec nginx-server nginx -s reload`), and remove the
 service in the portal's `/admin/services`. Keep the database and the data
 directory until you are sure.
 
-Dump the database (same method as infra's backup script):
+### Automatic backups
+
+infra's `backup` role runs on the home server every night at 02:00
+(`backup.timer`) and saves, into its own restic repository in Cloudflare R2:
+
+- one dump per database of the `postgresql` container, so `med-analyzer.sql.gz`
+  among them, tagged `pg-dump` and `run-<timestamp>`;
+- the uploads, `/opt/docker/med-analyzer`.
+
+Retention is 7 daily, 4 weekly and 3 monthly snapshots, applied only after a run
+without errors. Run one by hand with `sudo systemctl start backup.service`
+(`journalctl -u backup.service` for the log). The Backup dashboard in Grafana
+(host selector) and the `BackupStale` / `BackupAnomaly` alerts cover it. The
+repository URL and keys are in Infisical (`/hosts/zelgray-cherkasy/backup`); keep
+the restic password outside Infisical as well, or the snapshots cannot be opened.
+
+### Restore from a backup
+
+On the server, as root. Load the repository settings from the deployed backup
+script (it exports them) and list what is there:
+
+```bash
+sudo -i
+set -a; source <(grep '^export' /usr/local/bin/backup-run); set +a
+export RESTIC_CACHE_DIR=/var/cache/restic
+restic snapshots --tag pg-dump        # one snapshot per database and run
+```
+
+Restore the database into an empty one (`latest` is the newest dump; pass a
+snapshot ID instead to pick another):
+
+```bash
+docker stop med-analyzer
+docker exec postgresql psql -U postgres \
+    -c 'DROP DATABASE "med-analyzer"' \
+    -c 'CREATE DATABASE "med-analyzer" OWNER "med-analyzer"'
+restic dump latest /med-analyzer.sql.gz --tag pg-dump --path /med-analyzer.sql.gz \
+    | gunzip | docker exec -i postgresql psql -U postgres -d med-analyzer -v ON_ERROR_STOP=1
+```
+
+Restore the uploads; restic recreates the full path under `--target`, so `/`
+puts them back in place (restore into `/tmp/restore` first to only look):
+
+```bash
+restic restore latest --path /opt/docker/med-analyzer --target /
+docker start med-analyzer
+```
+
+Take the database dump and the uploads from the same run when you can: the
+dumps of one run share a `run-<timestamp>` tag (`restic snapshots`), the data
+snapshot is taken a few seconds later. These commands were tried on 2026-11-01
+against the first backup: the dump streams out with its tables, and the data
+directory restores to its original mode and owner.
+
+Manual dump without restic (a one-off copy before a risky change):
 
 ```bash
 docker exec postgresql pg_dump -U postgres med-analyzer | gzip > med-analyzer-$(date +%F).sql.gz
+tar -C /opt/docker -czf med-analyzer-data-$(date +%F).tar.gz med-analyzer   # as root, the directory is 0700
 ```
-
-Copy the uploads together with the dump (`tar -C /opt/docker -czf med-analyzer-data-$(date +%F).tar.gz med-analyzer`;
-run as root, the directory is `0700` and owned by uid 1000). Restore: the same
-two steps backwards into an empty database and directory, then redeploy.
 
 A bad release: check out the previous commit and run the deploy again. The
 container applies `alembic upgrade head` on every start and never downgrades,
