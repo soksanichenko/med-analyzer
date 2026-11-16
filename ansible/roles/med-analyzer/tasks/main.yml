@@ -83,9 +83,29 @@
       LOG_LEVEL: "{{ med_analyzer_log_level }}"
     memory: "{{ med_analyzer_memory_limit }}"
     memory_swap: "{{ med_analyzer_memory_limit }}"
+    labels:
+      monitoring.critical: "true"
     log_driver: journald
   become: true
   no_log: true
+  tags:
+    - med-analyzer
+
+# Same probe as the image's HEALTHCHECK, run here so that the deploy fails
+# instead of reporting success for a container that never came up.
+- name: Wait for med-analyzer health endpoint
+  community.docker.docker_container_exec:
+    container: "{{ med_analyzer_container_name }}"
+    argv:
+      - /app/venv/bin/python
+      - -c
+      - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:{{ med_analyzer_http_port }}/healthz', timeout=3)"
+  register: _med_analyzer_wait
+  until: _med_analyzer_wait.rc is defined and _med_analyzer_wait.rc == 0
+  retries: 18
+  delay: 10
+  changed_when: false
+  become: true
   tags:
     - med-analyzer
 
